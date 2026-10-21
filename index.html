@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Team Activity Portal</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1e293b}
+header{background:#123c69;color:#fff;text-align:center;padding:22px}
+.container{width:92%;max-width:850px;margin:25px auto}
+.card{background:#fff;padding:22px;border-radius:12px;margin-bottom:20px;box-shadow:0 3px 12px #0001}
+input,textarea,button,select{width:100%;padding:12px;margin:8px 0;border-radius:6px;border:1px solid #cbd5e1;font-size:15px}
+button{background:#2563eb;color:#fff;border:none;cursor:pointer;font-weight:bold}
+button:hover{opacity:.85}
+.done{background:#15803d}.reject{background:#dc2626}.logout{background:#475569}
+.activity{border:1px solid #e2e8f0;border-radius:8px;padding:15px;margin:12px 0;overflow-wrap:anywhere}
+.activity img{max-width:100%;max-height:300px;display:block;margin:10px 0;border-radius:8px}
+.status{font-weight:bold}.hidden{display:none}small{color:#64748b}
+</style>
+</head>
+<body>
+<header>
+<h1>👥 Team Activity Portal</h1>
+<p>Upload Activities • Share Photos • Track Progress</p>
+</header>
+<div class="container">
+
+<div class="card" id="loginPage">
+<h2>🔐 Login</h2>
+<label>Username</label>
+<input id="username" placeholder="Enter username">
+<label>Password</label>
+<input id="password" type="password" placeholder="Enter password">
+<button onclick="login()">Login</button>
+<p id="loginMessage"></p>
+<small>Demo student accounts: T1 / P1, T2 / P2, T3 / P3<br>Demo leader account: Leader / MS1</small>
+</div>
+
+<div id="studentPage" class="hidden">
+<div class="card">
+<h2>🎓 Student Dashboard</h2>
+<p id="studentWelcome"></p>
+<button class="logout" onclick="logout()">Logout</button>
+</div>
+<div class="card">
+<h3>📸 Upload Daily Activity</h3>
+<label>Activity Title</label>
+<input id="activityTitle" placeholder="Example: Tree Planting">
+<label>Activity Description</label>
+<textarea id="activityDescription" placeholder="Describe today’s activity"></textarea>
+<label>Activity Date</label>
+<input type="date" id="activityDate">
+<label>Upload Photo</label>
+<input type="file" id="activityPhoto" accept="image/*">
+<button onclick="submitActivity()">Submit Activity</button>
+<p id="uploadMessage"></p>
+</div>
+<div class="card">
+<h3>📋 My Activities</h3>
+<div id="myActivities"></div>
+</div>
+</div>
+
+<div id="leaderPage" class="hidden">
+<div class="card">
+<h2>👨‍💼 Team Leader Dashboard</h2>
+<p>Review student activities and approve submissions.</p>
+<button class="logout" onclick="logout()">Logout</button>
+</div>
+<div class="card">
+<h3>📊 Activity Summary</h3>
+<p id="summary"></p>
+</div>
+<div class="card">
+<h3>📝 All Student Activities</h3>
+<div id="allActivities"></div>
+</div>
+</div>
+
+</div>
+
+<script>
+/* DEMO ONLY: accounts and activities live in this browser. Do not reuse these credentials. */
+const users = {
+  T1:{password:"P1",role:"student"},
+  T2:{password:"P2",role:"student"},
+  T3:{password:"P3",role:"student"},
+  Leader:{password:"MS1",role:"leader"}
+};
+let currentUser = null;
+let activities = [];
+try { activities = JSON.parse(localStorage.getItem("teamActivities") || "[]"); } catch (e) { activities = []; }
+
+function saveActivities(){
+  try { localStorage.setItem("teamActivities", JSON.stringify(activities)); } catch (e) {}
+}
+
+function login(){
+  const name = document.getElementById("username").value.trim();
+  const pass = document.getElementById("password").value;
+  if(!users[name] || users[name].password !== pass){
+    document.getElementById("loginMessage").textContent = "Invalid username or password!";
+    return;
+  }
+  currentUser = {name:name, role:users[name].role};
+  document.getElementById("loginPage").classList.add("hidden");
+  if(currentUser.role === "leader"){
+    document.getElementById("leaderPage").classList.remove("hidden");
+    renderLeader();
+  } else {
+    document.getElementById("studentPage").classList.remove("hidden");
+    document.getElementById("studentWelcome").textContent = "Welcome, " + currentUser.name + "!";
+    document.getElementById("activityDate").value = new Date().toISOString().slice(0,10);
+    renderStudent();
+  }
+}
+
+function logout(){
+  currentUser = null;
+  document.getElementById("loginPage").classList.remove("hidden");
+  document.getElementById("studentPage").classList.add("hidden");
+  document.getElementById("leaderPage").classList.add("hidden");
+  document.getElementById("username").value = "";
+  document.getElementById("password").value = "";
+  document.getElementById("loginMessage").textContent = "";
+}
+
+function submitActivity(){
+  if(!currentUser || currentUser.role !== "student"){ alert("Only students can submit activities."); return; }
+  const title = document.getElementById("activityTitle").value.trim();
+  const description = document.getElementById("activityDescription").value.trim();
+  const date = document.getElementById("activityDate").value;
+  const file = document.getElementById("activityPhoto").files[0];
+  if(!title || !description || !date){ alert("Please fill in the title, description and date."); return; }
+  if(file && !file.type.startsWith("image/")){ alert("Please select an image file."); return; }
+  if(file && file.size > 1024*1024){ alert("Demo limit: Please choose an image under 1 MB."); return; }
+
+  const saveSubmission = (photo) => {
+    activities.push({
+      id: Date.now().toString() + Math.random().toString(16).slice(2),
+      student: currentUser.name, title, description, date, photo,
+      status: "Pending", feedback: ""
+    });
+    saveActivities();
+    document.getElementById("activityTitle").value = "";
+    document.getElementById("activityDescription").value = "";
+    document.getElementById("activityPhoto").value = "";
+    document.getElementById("uploadMessage").textContent = "Activity submitted successfully!";
+    renderStudent();
+  };
+
+  if(file){
+    const reader = new FileReader();
+    reader.onload = e => saveSubmission(e.target.result);
+    reader.readAsDataURL(file);
+  } else saveSubmission("");
+}
+
+function renderStudent(){
+  if(!currentUser || currentUser.role !== "student") return;
+  const box = document.getElementById("myActivities");
+  const mine = activities.filter(a => a.student === currentUser.name);
+  if(!mine.length){ box.innerHTML = "<p>No activities submitted yet.</p>"; return; }
+  box.innerHTML = mine.map(a => `
+    <div class="activity">
+      <h3>${escapeHTML(a.title)}</h3>
+      <p>${escapeHTML(a.description)}</p>
+      <p>Date: ${escapeHTML(a.date)}</p>
+      ${a.photo ? `<img src="${a.photo}" alt="Activity photo">` : ""}
+      <p class="status">Status: ${escapeHTML(a.status)}</p>
+      ${a.feedback ? `<p>Leader Feedback: ${escapeHTML(a.feedback)}</p>` : ""}
+    </div>`).join("");
+}
+
+function renderLeader(){
+  if(!currentUser || currentUser.role !== "leader") return;
+  const box = document.getElementById("allActivities");
+  const done = activities.filter(a => a.status === "Done").length;
+  const pending = activities.filter(a => a.status === "Pending").length;
+  const rejected = activities.filter(a => a.status === "Rejected").length;
+  document.getElementById("summary").textContent =
+    `Total: ${activities.length} | Pending: ${pending} | Done: ${done} | Rejected: ${rejected}`;
+  if(!activities.length){ box.innerHTML = "<p>No student activities submitted yet.</p>"; return; }
+  box.innerHTML = activities.map(a => `
+    <div class="activity">
+      <h3>${escapeHTML(a.title)}</h3>
+      <p><b>Student:</b> ${escapeHTML(a.student)}</p>
+      <p><b>Description:</b> ${escapeHTML(a.description)}</p>
+      <p><b>Date:</b> ${escapeHTML(a.date)}</p>
+      ${a.photo ? `<img src="${a.photo}" alt="Activity photo">` : ""}
+      <p class="status">Status: ${escapeHTML(a.status)}</p>
+      ${a.status === "Pending" ? `
+        <button class="done" onclick="changeStatus('${a.id}','Done')">Mark as Done</button>
+        <button class="reject" onclick="changeStatus('${a.id}','Rejected')">Reject</button>` : ""}
+      <label>Feedback</label>
+      <input id="feedback-${a.id}" value="${escapeHTML(a.feedback)}" placeholder="Enter feedback">
+      <button onclick="saveFeedback('${a.id}')">Save Feedback</button>
+    </div>`).join("");
+}
+
+function changeStatus(id, status){
+  if(!currentUser || currentUser.role !== "leader"){ alert("Only the Team Leader can change activity status."); return; }
+  if(!["Done","Rejected"].includes(status)) return;
+  const a = activities.find(x => x.id === id);
+  if(!a) return;
+  a.status = status;
+  saveActivities();
+  renderLeader();
+}
+
+function saveFeedback(id){
+  if(!currentUser || currentUser.role !== "leader"){ alert("Only the Team Leader can provide feedback."); return; }
+  const a = activities.find(x => x.id === id);
+  if(!a) return;
+  a.feedback = document.getElementById("feedback-" + id).value.trim();
+  saveActivities();
+  renderLeader();
+}
+
+function escapeHTML(v){
+  return String(v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+}
+</script>
+</body>
+</html>
